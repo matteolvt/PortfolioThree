@@ -4,6 +4,7 @@ import { createPoufLamp } from "./PoufLamp.js";
 import { createPortfolioBook } from "./PortfolioBook.js";
 import { createChair } from "./Chair.js";
 import { loadAirpodsMax } from "./AirpodsMaxStand.js";
+import { createPlantMonstera } from "./PlantMonstera.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
@@ -146,34 +147,67 @@ export default function ThreeRoom() {
     floor.receiveShadow = true;
 
     scene.add(floor);
+    /* -------------------- 🧱 MURS : béton clair + blanc cassé -------------------- */
 
-    /* -------------------- MURS -------------------- */
+    // 📏 Constantes de dimensions
     const WALL_H = 6;
     const HALF_W = 15 / 2;
     const HALF_D = 12 / 2;
     const EPS = 0.0005;
 
-    const wallMat = new THREE.MeshStandardMaterial({
-      color: 0x888888,
-      roughness: 0.8,
-      metalness: 0.05,
-      side: THREE.DoubleSide,
-    });
-
-    const backWall = new THREE.Mesh(
-      new THREE.PlaneGeometry(15, WALL_H),
-      wallMat
+    /* --- Textures du mur béton --- */
+    const concreteColor = texLoader.load(
+      "/assets/textures/walls/concrete_floor_worn_001_diff_4k.jpg"
     );
-    backWall.position.set(0, WALL_H / 2, -HALF_D - EPS);
+    const concreteRough = texLoader.load(
+      "/assets/textures/walls/concrete_floor_worn_001_rough_4k.jpg"
+    );
+    const concreteNormal = texLoader.load(
+      "/assets/textures/walls/concrete_floor_worn_001_nor_gl_4k.exr"
+    );
+    const concreteDisp = texLoader.load(
+      "/assets/textures/walls/concrete_floor_worn_001_disp_4k.png"
+    );
+
+    // Appliquer répétition et encodage
+    [concreteColor, concreteRough, concreteNormal, concreteDisp].forEach(
+      (t) => {
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.repeat.set(1.5, 1.5);
+        if (t instanceof THREE.Texture) t.colorSpace = THREE.SRGBColorSpace;
+      }
+    );
+
+    /* --- Mur du fond (béton clair) --- */
+    /* --- Mur du fond (béton clair, légèrement abaissé pour éviter la ligne) --- */
+    const backWallGeo = new THREE.PlaneGeometry(15, WALL_H, 128, 128);
+    const backWallMat = new THREE.MeshStandardMaterial({
+      map: concreteColor,
+      roughnessMap: concreteRough,
+      normalMap: concreteNormal,
+      displacementMap: concreteDisp,
+      displacementScale: 0.002,
+      roughness: 0.65,
+      metalness: 0.08,
+      color: new THREE.Color("#ffffffff"), // légèrement éclairci pour un rendu plus doux
+    });
+    const backWall = new THREE.Mesh(backWallGeo, backWallMat);
+    backWall.position.set(0, WALL_H / 2 - 0.05, -HALF_D - EPS); // ⬅️ abaissé de 0.05 pour cacher la ligne
+    backWall.receiveShadow = true;
     scene.add(backWall);
 
-    const leftWall = new THREE.Mesh(
-      new THREE.PlaneGeometry(12, WALL_H),
-      wallMat
-    );
-    leftWall.position.set(-HALF_W - EPS, WALL_H / 2, 0);
-    leftWall.rotation.y = Math.PI / 2;
-    scene.add(leftWall);
+    /* --- Mur gauche (blanc cassé) --- */
+    const sideWallGeo = new THREE.PlaneGeometry(12, WALL_H, 64, 64);
+    const sideWallMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color("#ECE6DF"), // blanc cassé doux et lumineux
+      roughness: 0.82,
+      metalness: 0.05,
+    });
+    const sideWall = new THREE.Mesh(sideWallGeo, sideWallMat);
+    sideWall.position.set(-HALF_W - EPS, WALL_H / 2, 0);
+    sideWall.rotation.y = Math.PI / 2;
+    sideWall.receiveShadow = true;
+    scene.add(sideWall);
 
     /* -------------------- FENÊTRE -------------------- */
     const W = 5.0;
@@ -367,13 +401,48 @@ export default function ThreeRoom() {
 
     /* -------------------- CHAISE -------------------- */
     const chair = createChair({
-      seatColor: "#D26A2E",
-      metalColor: "#D9D9D9",
+      seatColor: "#D25B2E", // 🧡 ton orangé plus chaud et naturel
+      metalColor: "#D9D9D9", // argent mat pour la base
       groundY: 0.004,
       forkDrop: 0.06,
       wheelRadius: 0.044,
       wheelWidth: 0.022,
     });
+
+    // Ajustement des matériaux manuellement si tu veux un rendu plus fin
+    chair.traverse((child) => {
+      if (child.isMesh) {
+        // Si c’est la partie cuir (si ton modèle sépare bien les zones)
+        if (
+          child.name.toLowerCase().includes("seat") ||
+          child.name.toLowerCase().includes("back")
+        ) {
+          child.material = new THREE.MeshStandardMaterial({
+            color: new THREE.Color("#D15A2A"), // ton orange plus naturel
+            roughness: 0.62, // un peu plus mat
+            metalness: 0.08, // subtile lueur
+            sheen: 0.4, // léger effet de brillance textile-cuir
+            sheenRoughness: 0.6, // plus doux sur les angles
+            envMapIntensity: 0.65, // réduit le reflet global
+          });
+        }
+
+        // Chrome doux pour les accoudoirs et base
+        if (
+          child.name.toLowerCase().includes("arm") ||
+          child.name.toLowerCase().includes("base") ||
+          child.name.toLowerCase().includes("wheel")
+        ) {
+          child.material = new THREE.MeshStandardMaterial({
+            color: new THREE.Color(0xd9d9d9),
+            roughness: 0.35, // plus mat que le chrome pur
+            metalness: 0.8, // conserve le côté métallique
+            envMapIntensity: 0.9,
+          });
+        }
+      }
+    });
+
     chair.position.set(-1.35, 0, -2.2);
     chair.rotation.y = Math.PI / 4;
     scene.add(chair);
@@ -394,12 +463,6 @@ export default function ThreeRoom() {
       const airpods = await loadAirpodsMax("/assets/models/model.glb", {
         scale: 0.077,
         variant: "spacegray",
-      });
-
-      // (optionnel) debug :
-      console.log("Meshes AirPods Max :");
-      airpods.traverse((child) => {
-        if (child.isMesh) console.log(child.name);
       });
 
       const standNames = new Set(STAND_NODE_NAMES);
@@ -440,6 +503,85 @@ export default function ThreeRoom() {
 
       scene.add(airpods);
     })();
+
+    // -------------------- PLANTE MONSTERA (version optimisée) --------------------
+    (async () => {
+      const plant = await createPlantMonstera({
+        scale: 3,
+        position: [-6.5, 0, -5.2],
+        rotationY: Math.PI / 6,
+      });
+
+      // 🔧 Allègement : on réduit la qualité des textures et désactive les maps inutiles
+      plant.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+
+          // ✅ Optionnel : supprime les maps existantes pour alléger la VRAM
+          if (child.material.map) child.material.map.dispose?.();
+          if (child.material.normalMap) child.material.normalMap.dispose?.();
+          if (child.material.roughnessMap)
+            child.material.roughnessMap.dispose?.();
+        }
+      });
+
+      scene.add(plant);
+    })();
+
+    // -------------------- ÉTAGÈRE MURALE HAUTE (10 étages) --------------------
+    const shelfGroup = new THREE.Group();
+    const shelfMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color("#D9C4A7"), // bois clair
+      roughness: 0.65,
+      metalness: 0.05,
+    });
+
+    const shelfCount = 9; //
+    const spacing = 0.42; // espacement ajusté pour garder un bon ratio
+    const shelfWidth = 0.9;
+    const shelfDepth = 0.5;
+    const shelfThickness = 0.05;
+
+    // Crée les étagères
+    for (let i = 0; i < shelfCount; i++) {
+      const shelf = new THREE.Mesh(
+        new THREE.BoxGeometry(shelfWidth, shelfThickness, shelfDepth),
+        shelfMat
+      );
+      shelf.position.set(0, i * spacing, 0);
+      shelfGroup.add(shelf);
+    }
+
+    // Planche supérieure (finition)
+    const topShelf = new THREE.Mesh(
+      new THREE.BoxGeometry(shelfWidth, shelfThickness, shelfDepth),
+      shelfMat
+    );
+    topShelf.position.set(0, shelfCount * spacing, 0);
+    shelfGroup.add(topShelf);
+
+    // Panneau arrière
+    const backPanel = new THREE.Mesh(
+      new THREE.BoxGeometry(
+        shelfWidth,
+        shelfCount * spacing + shelfThickness * 2,
+        0.05
+      ),
+      shelfMat
+    );
+    backPanel.position.set(
+      0,
+      (shelfCount * spacing) / 2,
+      -shelfDepth / 2 + 0.025
+    );
+    shelfGroup.add(backPanel);
+
+    // Position et orientation
+    shelfGroup.position.set(4.3, 0.1, -5.7);
+    shelfGroup.rotation.y = -Math.PI / 160; // ✅ légère orientation parfaite
+
+    scene.add(shelfGroup);
 
     /* -------------------- LUMIÈRES — Ambiance claire & naturelle avec lampe allumée -------------------- */
 

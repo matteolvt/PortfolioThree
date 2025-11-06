@@ -1,9 +1,9 @@
-import ThreeScene from "./Components/ThreeScene/ThreeScene.jsx";
+import Homepage from "./Pages/Homepage.jsx";
 
 function App() {
   return (
     <div>
-      <ThreeScene />
+      <Homepage />
     </div>
   );
 }
